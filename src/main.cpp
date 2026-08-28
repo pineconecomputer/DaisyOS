@@ -27,6 +27,9 @@
 #include "cursor.h"
 #include "daisybasic.h"
 #include "joyport.h"
+#include "terminal.h"
+#include "invaders.h"
+#include "zmachine.h"
 #include "daisybasic/basic_internal.h"
 
 // ===========================================================================
@@ -100,7 +103,6 @@ void SetupDaisy(void) {
   digitalWrite(kCpuReadyPin, LOW);
   delay(kVideoReadyMs);
   VideoMsgSendClearScreen(kSpaceChar);
-  VideoMsgSendReverseScreen(false);
   VideoMsgSendCursorAdvance(true);
   InitCursor();
   KeyboardTimerInit();
@@ -108,11 +110,74 @@ void SetupDaisy(void) {
 
 // Prints the startup banner and free-memory line.
 void Splash() {
-  Newline();
-  PrintStr("     **** Pinecone DaisyBasic ****");
-  Newline();
+  VideoMsgSendReverseScreen(true);
+  FillBlockShadow(1,1,4,5,235,255);
+  VideoMsgSendFillBlock(1, 1, 4, 5, 235, 255);
+  LocateCursor(6,2);
+  PrintStr("Pinecone Computer");
+  LocateCursor(6,3);
+  PrintStr("Daisy/1");
+  LocateCursor(7,6);
+  PrintStr("PRESS");
+  LocateCursor(7,8);
+  PrintStr("1 for DaisyBASIC");
+  LocateCursor(7,10);
+  PrintStr("2 for DaisyTerm");
+  LocateCursor(7,12);
+  PrintStr("3 for Space Invaders");
+  LocateCursor(7,14);
+  PrintStr("4 for Text Adventures");
+  // Park the cursor on the bottom line so the blink shows the machine is
+  // waiting for a key without sitting in the middle of the menu text.
+  LocateCursor(0, VID_HEIGHT - 1);
+}
+
+void BasicSplash(void) {
+  VideoMsgSendClearScreen(kSpaceChar);
+  LocateCursor(0,20);
+  PrintStr("Pinecone DaisyBASIC");
   Newline();
   BasicExecute("print fre(0);\" bytes free\"");
+}
+
+// Runs the boot menu until the user picks DaisyBASIC, ignoring any key that is
+// not one of the four listed choices. The screen is put back to normal video
+// and cleared before a program starts, since the menu leaves it reversed. Each
+// program owns the machine until it finishes; when it returns, the menu is
+// drawn again and offers the same choices, so the only way through to the BASIC
+// prompt is choice 1.
+void GetSplashSelection(void) {
+  for (;;) {
+    uint8_t key = BufferGet();
+    if (key < '1' || key > '4') {
+      continue;
+    }
+    // Take the cursor's attribute back off the cell, in case the blink left it
+    // set on the half-cycle the key arrived in.
+    ClearAttribute();
+    VideoMsgSendReverseScreen(false);
+    Clrscr(kSpaceChar);
+    LocateCursor(0, 0);
+    if (key == '1') {
+      return;
+    }
+    switch (key) {
+      case '2':
+        RunTerminal();
+        break;
+      case '3':
+        RunInvaders();
+        break;
+      default:  // '4'
+        RunZMachine();
+        break;
+    }
+    // Programs leave the screen cleared and in normal video, so the menu can be
+    // drawn straight over it. Anything still queued from the program that just
+    // exited would otherwise count as a menu choice.
+    BufferClear();
+    Splash();
+  }
 }
 
 // Boot: open the three coprocessor links, initialise input, video shadow RAM
@@ -137,6 +202,8 @@ void setup() {
   RtcInit();
   SetupDaisy();
   Splash();
+  GetSplashSelection();
+  BasicSplash();
 }
 
 // Main superloop. Watches for the PROG key, which releases the shared serial
