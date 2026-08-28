@@ -127,6 +127,8 @@ void Splash() {
   PrintStr("3 for Space Invaders");
   LocateCursor(7,14);
   PrintStr("4 for Text Adventures");
+  LocateCursor(7,16);
+  PrintStr("5 for Audio/Video demo");
   // Park the cursor on the bottom line so the blink shows the machine is
   // waiting for a key without sitting in the middle of the menu text.
   LocateCursor(0, VID_HEIGHT - 1);
@@ -149,7 +151,7 @@ void BasicSplash(void) {
 void GetSplashSelection(void) {
   for (;;) {
     uint8_t key = BufferGet();
-    if (key < '1' || key > '4') {
+    if (key < '1' || key > '5') {
       continue;
     }
     // Take the cursor's attribute back off the cell, in case the blink left it
@@ -168,13 +170,20 @@ void GetSplashSelection(void) {
       case '3':
         RunInvaders();
         break;
-      default:  // '4'
+      case '4':
         RunZMachine();
         break;
+      default:  // '5', the demo, which is a BASIC program rather than an app.
+        CmdShapeDemo();
+        // The demo runs until BREAK, which stops the interpreter but leaves the
+        // sound board playing its last program.
+        AudioMsgSendShutUp();
+        break;
     }
-    // Programs leave the screen cleared and in normal video, so the menu can be
-    // drawn straight over it. Anything still queued from the program that just
-    // exited would otherwise count as a menu choice.
+    // Clear away whatever the program left behind and redraw. Anything still
+    // queued from the program that just exited would otherwise count as a menu
+    // choice.
+    Clrscr(kSpaceChar);
     BufferClear();
     Splash();
   }
